@@ -1,0 +1,39 @@
+# Official language image. Look for the different tagged releases at:
+# https://hub.docker.com/r/library/python/tags/
+image: ubuntu:16.04
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PROJECT_ID: "$(gcloud config get-value project)"
+  REGION: "$(gcloud config get-value compute/region)"
+
+
+before_script:
+  RUN cd ~/GKE-and-Sample-App/
+  RUN gcloud container clusters get-credentials multitierapp --zone asia-southeast1-a --project tiergitlab
+  COPY src/requirements.txt .
+  RUN apt-get update
+  RUN apt-get install -y tar git curl nano wget dialog net-tools build-essential
+  RUN apt-get install -y python python-dev python-distribute python-pip libmysqlclient-dev
+  RUN pip install -r requirements.txt
+  RUN apt-get install -y mysql-client
+  RUN mkdir /code
+  COPY src /code
+  WORKDIR /code
+  EXPOSE 5000
+  ENTRYPOINT ["python", "app.py"] 
+
+test:
+  script:
+    - kubectl get nodes
+    - kubectl create -f mysql-service.yaml
+    - kubectl create -f testapp-service.yaml
+
+
+run:
+  script:
+    - kubectl create -f mysql-deployment.yaml
+    - kubectl create -f testapp-deployment.yaml
+
+  only:
+    - master
